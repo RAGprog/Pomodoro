@@ -10,76 +10,10 @@
 ;====================================================================
 ; DEFINITIONS
 ;====================================================================
-; portB
-.equ red_pin = 1 << 0
-.equ red_pnum = 0
-.equ green_pin = 1 << 1
-.equ green_pnum = 1
-.equ blue_pin = 1 << 2
-.equ blue_pnum = 2
-.equ yellow_pnum = 3
-.equ yellow_pin = 1 << yellow_pnum
-.equ w1_pnum = 4
-.equ w2_pnum = 5
-.equ w3_pnum = 6
-.equ w4_pnum = 7
 
+#include "const.inc" ;.INCLUDE 
+#include "macro.inc"
 
-;portD
-.equ setup_pin = 1 << 2
-.equ setup_pnum = 2
-
-;sleep mode
-.equ sleep_e = 1	; enable
-;.equ sleep_e = 1 << SE
-.equ sleep_m = 0	; 0 - idle, 1 - power-down
-;.equ sleep_m = 0 << SM
-
-
-; 1 cycle = 16.384ms
-.equ S1 = 61
-
-.equ S3 = 183
-
-.equ M5L = 134	;	5m = 134	(,55)
-.equ M5H = 71	;	5m = 71
-
-.equ M15L = 147	;	15m = 147	(.64)
-.equ M15H = 214	;	15m = 214
-
-.equ M25L	= 161	;	(-.27)
-.equ M25H	= 101
-.equ M25HH	= 1
-
-;_________TEST_MODE____________
-.macro prodmode
-
-	.set tim_m1L = M25L
-	.set tim_m1H = M25H
-	.set tim_m1HH = M25HH
-
-	.set tim_m2L = M5L
-	.set tim_m2H = M5H
-	.set tim_m2HH = 0
-
-	.set tim_m3L = M15L
-	.set tim_m3H = M15H
-	.set tim_m3HH = 0
-.endmacro
-
-.macro testmode
-	.set tim_m1L = s3
-	.set tim_m1H = 0
-	.set tim_m1HH = 0
-
-	.set tim_m2L = s1
-	.set tim_m2H = 0
-	.set tim_m2HH = 0
-
-	.set tim_m3L = s1 * 2
-	.set tim_m3H = 0
-	.set tim_m3HH = 0
-.endmacro
 
 ; ____________How to execute?_____________; choose one:
 testmode
@@ -104,29 +38,7 @@ prodmode
 .def mode = r21	; 1 = 1s, 2 = 3s
 .def bmode = r22	; modes for button
 
-;====================================================================
-; MACROs
-;====================================================================
 
-
-.macro rout		; port, reg, k
-	ldi @1, @2
-	out @0, @1
-.endmacro
-
-.macro tout		; port, k
-	rout @0, temp, @1
-.endmacro
-
-.macro toutpb		; k
-	rout portb, temp, @0
-.endmacro
-
-.macro toutb		; port, reg, k
-	ldi temp, @0
-	out portB, temp
-	out ddrB, temp
-.endmacro
 
 ;====================================================================
 ; RESET and INTERRUPT VECTORS
