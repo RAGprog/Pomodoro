@@ -12,18 +12,22 @@
 .equ w3_pnum = 6
 .equ w4_pnum = 7
 
+.equ day = $ffffff  ; to edit [ ]
+
 
 ;portD
 .equ setup_pin = 1 << 2
 .equ setup_pnum = 2
 
 ;sleep mode
-.equ sleep_e = 1	; enable
-;.equ sleep_e = 1 << SE
-.equ sleep_m = 0	; 0 - idle, 1 - power-down
-;.equ sleep_m = 0 << SM
+;.equ sleep_e = 1	; enable
+.equ sleep_e = 1 << SE
+;.equ sleep_m = 0	; 0 - idle, 1 - power-down
+.equ sleep_m = 0 << SM
 
-
+.equ MCUCR_pint0f =	sleep_e |	sleep_m |	0 << ISC11 |	0 << ISC10 |	1 << ISC01 |	0 << ISC00
+.equ MCUCR_pint0r =	sleep_e |	sleep_m |	0 << ISC11 |	0 << ISC10 |	1 << ISC01 |	1 << ISC00
+		; ...Interrupt 0 Sense Control 10 - falling edge, 11 - rising, 00 - Low lvl
 
 ;================================
 
