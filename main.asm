@@ -17,6 +17,7 @@
 
 #include "const.inc" ;.INCLUDE 
 #include "macro.inc"
+#include "timer.inc"
 
 
 ; ____________Настройка_параметров_____________
@@ -29,21 +30,12 @@ testmode 1 ; 1 = test mode (3s), 0 = prod. mode (25min)
 ; VARIABLES	|	Переменные
 ;====================================================================
 .def temp = r16
-.def countHH = r20
-.def countH = r17
-.def countL = r18
-.def one = r19
 
-;.def temp_blink = r23
+;.def setStatus = r2
+;.def mode = r21	; 1 = 1s, 2 = 3s
+;.def bmode = r22	; modes for button
 
-.def setStatus = r2
-.def mode = r21	; 1 = 1s, 2 = 3s
-.def bmode = r22	; modes for button
-
-;general timer
-.def timeL = r23
-.def timeH = r24
-.def timeHH = r25
+timer_var r23, r24, r25, r16, r22
 
 ; zyx = 31:26
 
@@ -71,24 +63,24 @@ testmode 1 ; 1 = test mode (3s), 0 = prod. mode (25min)
 EXT_INT0: ;________________________________
 	; noise reduction:
 	
-	mov temp, setStatus
+;	mov temp, setStatus
 	; go to timer
-	cpi temp, 0
-	breq int0_push
+;	cpi temp, 0
+;	breq int0_push
 	
 	; button released, do smth, another 1 timer ckl skip
-	cpi temp, 3
-	breq int0_release
-	mov setStatus, temp
-reti
-	int0_push:
-		inc temp	; status 1
-		mov setStatus, temp
-reti
+;	cpi temp, 3
+;	breq int0_release
+;	mov setStatus, temp
+;reti
+;	int0_push:
+;		inc temp	; status 1
+;		mov setStatus, temp
+;reti
 	int0_release:
 		;inc setStatus	; что-то сделать с этим: задержка откладывается до выполнения задачи mode
 
-		mov mode, bmode
+;		mov mode, bmode
 
 reti
 
@@ -97,230 +89,8 @@ TIM_OVF1: ;________________________________
 reti
 
 TIM_OVF0: ;________________________________
-	cli	; int off
-	
-	; for stack usage:
-	;pop r5			; предположительно - PC, pointer
-	; in temp, sreg	; status reg saving
-	; push temp
-	
-	; general timer
-	dec timeL
-	;brne time	; перейти на метку "time", если не было перехода через ноль
-	sbci timeH, 0	; отнять с остатком (отнимет 1 только при переходе через ноль)
-	;brne time
-	sbci timeHH, 0
-	; Проверка окончания суток:
-	cpi timeL, LOW(day)	; сравнить
-	brne time	;	перейти на метку "time", если не равны
-	cpi timeH, BYTE2(day)
-	brne time
-	cpi timeH, BYTE3(day)
-	brne time
-	; Проверить правильность сброса таймера [ ]:
-	ldi timeL, 255
-	ldi timeH, 255
-	ldi timeHH, 255
-
-	time:
-
-	; modes
-	; 1	- 4 x 25
-	cpi mode, 1
-	breq mode_1
-	cpi mode, 3
-	breq mode_1
-	cpi mode, 5
-	breq mode_1
-	cpi mode, 7
-	breq mode_1
-	; 2 - 3 x 5
-	cpi mode, 2
-	breq mode_2
-	cpi mode, 4
-	breq mode_2
-	cpi mode, 6
-	breq mode_2
-	; 3 - 1 x 15
-	cpi mode, 8
-	breq mode_3		; out of rich [ ] to fix
-	; else (if mode not 0):
-	cpi mode, 0
-	breq mode_0
-	;sbrc SREG, Z	; bit1 in sreg	; [+] replace, doesn't work
-	ldi bmode, 1	; reset bmode, if mode == 0: skip
-	mode_0:
-
-
-	
-	
-	;push r5		; перенесено выше, т.к. в прот.случае придется повторять в ветках
-	
-	mov temp, setStatus
-	; int0 noise skiping, falling
-	cpi temp, 1
-	breq tim0_int0_1
-	cpi temp, 2
-	breq tim0_int0_2
-	; int0 noise skiping, rising
-	cpi temp, 4
-	breq tim0_int0_4
-	cpi temp, 5
-	breq tim0_int0_5
-
-	mov setStatus, temp
-	
-	sei
-reti
-	tim0_int0_1:
-		inc temp
-		mov setStatus, temp
-		sei
-reti
-	tim0_int0_2:
-		inc temp
-		mov setStatus, temp
-		; rising int:
-		tout	MCUCR,	MCUCR_pint0r
-		sei
-reti
-	tim0_int0_4:
-		inc temp
-		mov setStatus, temp
-		sei
-reti
-	tim0_int0_5:
-		clr temp	; first state
-		mov setStatus, temp
-		; faling int:
-		tout	MCUCR,	MCUCR_pint0f
-		sei
-reti
-	mode_1:	; 3s + LED	;to macro
-		mov r4, temp	; saving temp
-		clr temp
-		
-		; LEDs on
-		;cbi Portb, green_pnum	; LED2 off
-		sbi Portb, red_pnum		; LED1 on
-	
-		;inc countL	 ; not work for this (theory: it is subi -1)
-		ldi one, 1
-		add countL, one		; true +1
-		adc countH, temp	; +carry	(temp = 0)
-		adc countHH, temp
-
-		
-		cpi countHH, tim_m1HH
-		brne notatime_1;endoftim
-		cpi countH, tim_m1H
-		brne notatime_1;endoftim
-		cpi countL, tim_m1L
-		brne notatime_1
-		; it's the time:
-		ldi countL, 0
-		ldi countH, 0
-		clr countHH
-		
-		; LEDs off
-		cbi Portb, red_pnum	; LED off
-		
-		ldi mode, 0
-		inc bmode	; next - mode 2, 4, 6...
-		
-		notatime_1:
-		
-		mov temp, r4	; temp recovery
-		sei
-reti
-	mode_2:
-	rjmp mode_2j
-	mode_3:
-	rjmp mode_3j
-	; ldi r30, LOW(mode_3j)
-	; ldi r31, HIGH(mode_3j)
-	; ijmp	; переход по адресу в rZ(jump to address in rZ)
-	mode_2j:	; 1s + other LED
-		mov r4, temp	; saving temp
-		clr temp
-		
-		; LEDs
-		;cbi Portb, red_pnum		; LED1 off
-		sbi Portb, green_pnum	; LED2 on
-	
-		;inc countL	 ; not work for this (theory: it is subi -1)
-		ldi one, 1
-		add countL, one		; true +1
-		adc countH, temp	; +carry	(temp = 0)
-		
-		cpi countHH, tim_m2HH
-		brne notatime_2
-		cpi countH, tim_m2H
-		brne notatime_2;endoftim
-		cpi countL, tim_m2L
-		brne notatime_2
-		; it's the time:
-		ldi countL, 0
-		ldi countH, 0
-		clr countHH	; L, H, HH = 0
-		
-		; LEDs off
-		cbi Portb, green_pnum	; LED off
-		
-		ldi mode, 0	; возврат режима 0
-		inc bmode	; next - mode 3, 5, etc.
-		
-		notatime_2:
-		
-		mov temp, r4	; temp recovery
-		sei
-reti
-	mode_3j:
-		mov r4, temp	; saving temp
-		clr temp
-		
-		; LEDs
-		;cbi Portb, red_pnum		; LED1 off
-		sbi Portb, green_pnum	; LED2 on
-	
-		;inc countL	 ; not work for this (theory: it is subi -1)
-		ldi one, 1
-		add countL, one		; true +1
-		adc countH, temp	; +carry	(temp = 0)
-		
-		;add temp_blink, one
-		;cpi temp_blink, s1
-		;brlo skip_bl
-		;cbi Portb, green_pnum
-		;skip_bl:
-		;cpi temp_blink, s1 * 2
-		;brlo skip_bl2
-		;sbi portB, green_pnum
-		;skip_bl2:
-
-
-		cpi countHH, tim_m3HH
-		brne notatime_3
-		cpi countH, tim_m3H
-		brne notatime_3;endoftim
-		cpi countL, tim_m3L
-		brne notatime_3
-		; it's the time:
-		ldi countL, 0
-		ldi countH, 0
-		clr countHH	; L, H, HH = 0
-		
-		; LEDs off
-		cbi Portb, green_pnum	; LED off
-		
-		ldi mode, 0	; возврат режима 0
-		inc bmode	; next - mode 3, 5, etc.
-		
-		notatime_3a:
-		notatime_3:
-		
-		mov temp, r4	; temp recovery
-		sei
+	;old_timer_m
+	timer_m
 reti
 
 ;_____________________
@@ -336,9 +106,10 @@ Start: ;_____________________________RESET:__________________________
 	tout	TIMSK,	1 << TOIE1 |	0 << OCIE1A |	0 << TICIE1 |	1 << TOIE0
 
 	; general timer init ; set a time [ ]
-	ldi timeL, 255
-	ldi timeH, 255
-	ldi timeHH, 255
+	;ldi timeL, 255
+	;ldi timeH, 255
+	;ldi timeHH, 255
+	timer_var_init
 
 ; pins int
 	; int0
@@ -361,9 +132,7 @@ Start: ;_____________________________RESET:__________________________
 	; clr from random val
 	clr setStatus
 	clr mode
-	clr countL
-	clr countH
-	clr countHH
+
 	
 	ldi temp, RAMend	; init stack
 	out SPL, temp
