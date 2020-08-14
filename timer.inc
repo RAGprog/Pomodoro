@@ -59,11 +59,11 @@
     ; general timer init ; set a time [ ]
 	clr r27
     ldi r26, RAMbeg
-    ldi tcomp, 255  ; @0 - рассчитать из HH:MM:SS -> HH:H:L
+    ldi tcomp, 254  ; @0 - рассчитать из HH:MM:SS -> HH:H:L		[ ] исправить инициализацию
     st x+, tcomp
 	ldi tcomp, 255
     st x+, tcomp
-	ldi tcomp, 255
+	ldi tcomp, 254
     st x+, tcomp
 
     ; blink init
@@ -73,7 +73,7 @@
     ld tcomp, x+
     sbci tcomp, 255 - BYTE2(blink_delay)
     st x+, tcomp
-    ldi tcomp, 255 - LOW(blink_delay)
+    ldi tcomp, 254 - LOW(blink_delay)
     st x+, tcomp
 .endmacro
 
@@ -85,12 +85,22 @@
     ldi r26, RAMbeg
     ld timeL, x+
     ld timeH, x+
-    ld timeHH, x+
+    ld timeHH, x	; оставляем, для перезаписи
 
     ; general timer
+	; это не работает правильно. Попробую очистить флаг С заранее [?]
+	; нет записи в ОЗУ?
+	clc
 	dec timeL
 	sbci timeH, 0	; отнять с остатком (отнимет 1 только при переходе через ноль)
 	sbci timeHH, 0
+	; Запись в ОЗУ
+	st x, timeHH
+	st -x, timeH
+	st -x, timeL
+	; возвращаем адрес
+	ldi r26, RAMbeg + 3	; можно переместить на требуемое место
+
 	; Проверка окончания суток:
 	cpi timeL, LOW(day)	; сравнить
 	brne time	;	перейти на метку "time", если не равны
@@ -161,7 +171,7 @@
 	; push temp
 	
 	; general timer
-	dec timeL
+	subi timeL, 1
 	;brne time	; перейти на метку "time", если не было перехода через ноль
 	sbci timeH, 0	; отнять с остатком (отнимет 1 только при переходе через ноль)
 	;brne time
