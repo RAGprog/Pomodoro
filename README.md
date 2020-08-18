@@ -1,5 +1,11 @@
 # AVR MCU implementation of pomodoro time controller
 
+## attiny13 ed:
+
+* in dev.
+
+---
+
 The current version is for the cheap but old __at90s2313__ or __attiny2313__ (_in at90s2313 mode_).  
 
 * Freq. = 16MHz (changeble)
