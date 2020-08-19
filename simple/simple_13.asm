@@ -25,6 +25,7 @@ testmode 1 ; 1 = test mode (3s), 0 = prod. mode (25min)
 ;====================================================================
 
 .def temp = r16
+.def pin = r17
 
 ;====================================================================
 ; RESET and INTERRUPT VECTORS	|	Сброс и векторы прерываний
@@ -51,10 +52,23 @@ reti
 
 TIM0_OVF:
     ;
+    eor temp, pin ;исключающее ИЛИ (OR)
+    out PORTB, temp 
 reti
 
-reset:
+reset:  ;_____________________________________________________________
     tout SPL, low(RAMEND)   ; Set Stack Pointer to top of RAM
+
+    ;загрузка в регистр temp "1", смещенной на TOIE0, прерывание по переполнению таймера 0
+    tout TIMSK0, (1<<TOIE0)
+    ;загрузка двух единиц смещенных на CS00 и CS02 в регистр temp, тактовая частота разделена на 1024
+    tout TCCR0B, (1<<CS00)|(1<<CS02)
+    out TCCR0B, temp 
+    ldi pin, (1<<3) ;загрузка в рег 1, смещ на 4 разряда влево
+    out DDRB, pin
+    ;отключение компаратора:
+    tout ACSR, 1<<ADC   ;off
+    clr temp 
 
     sei
 
