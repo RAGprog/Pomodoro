@@ -13,6 +13,7 @@
 .equ w4_pnum = 7
 
 .equ day = $ffffff  ; to edit [ ]
+.set tim_prescaler = 1024
 
 
 ;portD
@@ -31,9 +32,9 @@
 
 ;================================
 
-.macro freq ;MHz
-    .set tim_prescaler = 1024
-    .set timer_freq = @0 * 1000000 / tim_prescaler / 256
+.macro freq ;Hz
+ ;   .set tim_prescaler = 1024
+    .set timer_freq = @0 * 100 / tim_prescaler / 256
     .set S1 = 1 * timer_freq
     .set S3 = 3 * timer_freq
     .set M5 = 5 * 60 * timer_freq
@@ -80,3 +81,7 @@
 ;; Для надежности здесь рассчитываются паузы по умолчанию:
 ;testmode 0
 ; нет, это накладно, придется задавать и частоту
+
+; Для надежности здесь рассчитываются паузы по умолчанию:
+freq 96000
+testmode 0
