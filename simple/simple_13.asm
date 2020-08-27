@@ -14,7 +14,7 @@
 ; [+] Настраиваемая частота процессора
 ; [+] Сон
 ; [+] Высчитывать время для таймера для частот МК от 37,5 кГц
-; [ ] Отработать нажатия
+; [~] Отработать нажатия
 ; [ ] Таймер (25 мин)
 ; [ ] Настроить прерывания по отпусканию кнопки
 
@@ -47,7 +47,8 @@ testmode 1 ; 1 = test mode (3s), 0 = prod. mode (25min)
 .def act_flags = r18    ; 0 - noiseT
 ; act_flags's bits:
 .equ noiseT = 0
-.equ RedOn = 1  ; Зажеч светодиод после отпускания кнопки
+.equ noiseT_release = 1
+.equ RedOn = 2  ; Зажеч светодиод после отпускания кнопки
 
 ;====================================================================
 ; RESET and INTERRUPT VECTORS	|	Сброс и векторы прерываний
@@ -71,7 +72,7 @@ testmode 1 ; 1 = test mode (3s), 0 = prod. mode (25min)
 EXT_INT0:
     ; set noise timer flag
     set
-    bld act_flags, noiseT
+    bld act_flags, noiseT   ; bit load, бит задержки против шума в рег.флагов
 reti
 
 TIM0_OVF:
@@ -79,22 +80,37 @@ TIM0_OVF:
     eor temp, pin ;исключающее ИЛИ (OR)
     out PORTB, temp 
 
+    ; [ ] выполнить, когда пройдет заданное время
     ; read noise timer flag
     ;bst
     ; skip if noiseT flag not set    |  Пропустить, если флаг noiseT не установлен
     sbrs act_flags, noiseT
-    rjmp act1
+    rjmp button
 
 reti
 
-act1:
+button:
+    ; ждать здесь? или call после основной операции [ ] 
     clt
     bld act_flags, noiseT
+    ; две ветви действия: нажатие и отпускание
+    sbrs act_flags, noiseT_release
+    rjmp button_release
+    rjmp button_press
 
+button_press:
     ; действие
     ; установка другого флага
     ; перевод кнопки на прерывания по спаду/фронту
+    set
+    bld act_flags, noiseT_release
+    tout	MCUCR,	MCUCR_pint0r    ; проверить [ ]
+reti
 
+button_release:
+    clt
+    bld act_flags, noiseT_release
+    tout	MCUCR,	MCUCR_pint0f    ; проверить [ ]
 reti
 
 reset:  ;_____________________________________________________________
@@ -120,6 +136,9 @@ reset:  ;_____________________________________________________________
     
     ;sleep
     tout MCUCR, 1 << SE ; Sleep Enable
+
+    ; int0, -> GIFR
+    tout	GIMSK,	1 << int0 | 0 << PCIE	; General Interrupt Mask
 
     clr temp 
 
