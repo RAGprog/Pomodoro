@@ -15,9 +15,11 @@
 ; [+] Сон
 ; [+] Высчитывать время для таймера для частот МК от 37,5 кГц
 ; [~] Отработать нажатия
-;   [ ] Решить проблему запуска макросов с "@1"
+;   [+] Решить проблему запуска макросов с "@1" - typo: "ADC" != "ACD"
+;   [~] Настроить прерывания по отпусканию кнопки
+;   [ ] Изучить поведение СД
 ; [ ] Таймер (25 мин)
-; [ ] Настроить прерывания по отпусканию кнопки
+;   []
 
 ;====================================================================
 ; Fuses	|	
@@ -49,7 +51,7 @@ testmode 1 ; 1 = test mode (3s), 0 = prod. mode (25min)
 ; act_flags's bits:
 .equ noiseT = 0
 .equ noiseT_release = 1
-.equ RedOn = 2  ; Зажеч светодиод после отпускания кнопки
+.equ RedT = 2  ; Зажеч светодиод после отпускания кнопки
 
 ;====================================================================
 ; RESET and INTERRUPT VECTORS	|	Сброс и векторы прерываний
@@ -77,25 +79,36 @@ EXT_INT0:
 reti
 
 TIM0_OVF:
-    ;
-    eor temp, pin ;исключающее ИЛИ (OR)
-    out PORTB, temp 
+    ;;
+    ;eor temp, pin ;исключающее ИЛИ (OR)
+    ;out PORTB, temp 
+
+    ; Отключени СД, Пропустить, если флаг не установлен
+    sbrc act_flags, RedT
+    cbi pinB, red_pnum
+    ;rcall RedLOff
 
     ; [ ] выполнить, когда пройдет заданное время
     ; read noise timer flag
     ;bst
     ; skip if noiseT flag not set    |  Пропустить, если флаг noiseT не установлен
-    sbrs act_flags, noiseT
+    sbrc act_flags, noiseT  ; было sbrs, найти все такие ошибки [~]
     rjmp button
 
 reti
+
+RedLOff:
+    cbi pinB, red_pnum
+    clt
+    bld act_flags, RedT
+ret
 
 button:
     ; ждать здесь? или call после основной операции [ ] 
     clt
     bld act_flags, noiseT
     ; две ветви действия: нажатие и отпускание
-    sbrs act_flags, noiseT_release
+    sbrc act_flags, noiseT_release  ; fix
     rjmp button_release
     rjmp button_press
 
@@ -105,13 +118,17 @@ button_press:
     ; перевод кнопки на прерывания по спаду/фронту
     set
     bld act_flags, noiseT_release
-    tout	MCUCR,	MCUCR_pint0r    ; проверить [ ]
+    tout	MCUCR,	MCUCR_pint0r    ; проверить [~]
 reti
 
 button_release:
     clt
     bld act_flags, noiseT_release
-    tout	MCUCR,	MCUCR_pint0f    ; проверить [ ]
+    tout	MCUCR,	MCUCR_pint0f    ; проверить [~]
+
+    set
+    bld act_flags, RedT ; флаг ожидания для СД
+    sbi pinB, red_pnum
 reti
 
 reset:  ;_____________________________________________________________
@@ -119,13 +136,13 @@ reset:  ;_____________________________________________________________
 
     ;загрузка в регистр temp "1", смещенной на TOIE0, прерывание по переполнению таймера 0
     tout TIMSK0, (1<<TOIE0)
-    ;загрузка двух единиц смещенных на CS00 и CS02 в регистр temp, тактовая частота разделена на 1024
-    tout TCCR0B, (1<<CS00)|(1<<CS02)
+    ;загрузка двух единиц смещенных на CS00 и CS02 в регистр temp, тактовая частота разделена на 64
+    tout TCCR0B, (1<<CS00)|(1<<CS01)|(0<<CS02)
     out TCCR0B, temp 
     ldi pin, (1<<3) ;загрузка в рег 1, смещ на 4 разряда влево
     out DDRB, pin
     ;отключение компаратора:
-    tout ACSR, 1<<ADC   ;off
+    tout ACSR, 1<<ACD   ;off
 
     ; Freq, *move it up
     ; Oscillator Calibration
@@ -140,8 +157,12 @@ reset:  ;_____________________________________________________________
 
     ; int0, -> GIFR
     tout	GIMSK,	1 << int0 | 0 << PCIE	; General Interrupt Mask
+    tout	MCUCR,  MCUCR_pint0f            ; Прерывание по спаду + сон
 
-    clr temp 
+    ; button init
+    tout PORTB, 1<<1
+
+    ;clr temp 
 
     sei
 

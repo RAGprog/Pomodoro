@@ -1,19 +1,22 @@
 ; portB
 .equ red_pin = 1 << 0
 .equ red_pnum = 0
-.equ green_pin = 1 << 1
-.equ green_pnum = 1
-.equ blue_pin = 1 << 2
-.equ blue_pnum = 2
-.equ yellow_pnum = 3
-.equ yellow_pin = 1 << yellow_pnum
-.equ w1_pnum = 4
-.equ w2_pnum = 5
-.equ w3_pnum = 6
-.equ w4_pnum = 7
+.equ green_pin = 1 << 2
+.equ green_pnum = 2
+.equ blue_pin = 1 << 3
+.equ blue_pnum = 3
+.equ buzz_pnum = 4
+;.equ yellow_pnum = 3
+;.equ yellow_pin = 1 << yellow_pnum
+;.equ w1_pnum = 4
+;.equ w2_pnum = 5
+;.equ w3_pnum = 6
+;.equ w4_pnum = 7
 
 .equ day = $ffffff  ; to edit [ ]
 .set tim_prescaler = 1024
+
+;.set freq_cal = 0
 
 
 ;portD
