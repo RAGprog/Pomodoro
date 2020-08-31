@@ -59,26 +59,41 @@
     ; general timer init ; set a time [ ]
 	clr r27
     ldi r26, RAMbeg
-    ldi tcomp, 254  ; @0 - рассчитать из HH:MM:SS -> HH:H:L		[ ] исправить инициализацию
-    st x+, tcomp
+    ldi tcomp, 255  ; @0 - рассчитать из HH:MM:SS -> HH:H:L		[ ] исправить инициализацию
+    st x+, tcomp	; TL = 255
 	ldi tcomp, 255
-    st x+, tcomp
+    st x+, tcomp	; TH = 255
 	ldi tcomp, 254
-    st x+, tcomp
+    st x+, tcomp	; THH = 254
+	; вместо 255:255:254 должны устанавливаться нулевые значения полного круга
+	; минус текущее время	[ ] (connected)
 
-    ; blink init
+	; вместо 255:255:254 должны устанавливаться нулевые значения полного круга,
+	; т.е. сутки	-
+
+    ; blink init ; убедиться в правильности/удобности порядка [ ]
     ld tcomp, x+
     subi tcomp, 254 - BYTE3(blink_delay)
     st x+, tcomp
     ld tcomp, x+
     sbci tcomp, 255 - BYTE2(blink_delay)
     st x+, tcomp
-    ldi tcomp, 254 - LOW(blink_delay)
+    ldi tcomp, 255 - LOW(blink_delay)
     st x+, tcomp
 .endmacro
 
 .macro timer_m
-    cli ; int off
+    cli ; int off	; это производится автоматически?{ }
+
+	; сохранение содержимого регистров в стеке
+	;push timeL
+	;push timeH
+	;push timeHH
+	; чтобы активировать нужно добавить pop в конце:
+	;pop timeHH
+	;pop timeH
+	;pop timeL
+	; возможно, целесообразнее использовать call завершающей процедуры
 
     ; loading from RAM | загрузка из ОЗУ ; add for start [ ]
     clr r27
@@ -88,10 +103,10 @@
     ld timeHH, x	; оставляем, для перезаписи
 
     ; general timer
-	; это не работает правильно. Попробую очистить флаг С заранее [?]
+	; это не работает правильно. Попробую очистить флаг С заранее [~]
 	; нет записи в ОЗУ?
 	clc
-	dec timeL
+	subi timeL, 1	; согласно doc dec не изменяет C, проверить синонимичность { }
 	sbci timeH, 0	; отнять с остатком (отнимет 1 только при переходе через ноль)
 	sbci timeHH, 0
 	; Запись в ОЗУ
