@@ -35,6 +35,8 @@
 	; минус текущее время	[ ] (connected)
 
 	.equ init_blink_delay = init_time - blink_delay
+
+	.set next_RAM = 0	; убедиться в корректности работы
 .endmacro
 
 .macro old_timer_var
@@ -86,12 +88,19 @@
     st x+, tcomp
     ldi tcomp, LOW(init_blink_delay)
     st x+, tcomp
+
+	ldi tcomp, BYTE3(init_time - 90)
+    st x+, tcomp
+    ldi tcomp, BYTE2(init_time - 90)
+    st x+, tcomp
+    ldi tcomp, LOW(init_time - 90)
+    st x+, tcomp
 .endmacro
 
 .macro timer_m
     cli ; int off	; это производится автоматически?{ }
 
-	; сохранение содержимого регистров в стеке
+	; сохранение содержимого регистров в стеке______________
 	;push timeL
 	;push timeH
 	;push timeHH
@@ -101,23 +110,21 @@
 	;pop timeL
 	; возможно, целесообразнее использовать call завершающей процедуры
 
-    ; loading from RAM | загрузка из ОЗУ ; add for start [ ]
+    ; loading from RAM | загрузка из ОЗУ ; add for start [ ]_________
     clr r27
     ldi r26, RAMbeg
     ld timeL, x+
     ld timeH, x+
     ld timeHH, x	; оставляем, для перезаписи
 
-    ; general timer
-	; это не работает правильно. Попробую очистить флаг С заранее [~]
-	; нет записи в ОЗУ?
+	; general timer_________________________
 	clc
 	subi timeL, 1	; согласно doc dec не изменяет C, проверить синонимичность { }
 	sbci timeH, 0	; отнять с остатком (отнимет 1 только при переходе через ноль)
 	sbci timeHH, 0
 	; проверка окончания суток (вместо пред. констр.):
 	;brlo time	; елси отняли 1 от 0, то перейти на метку "time" 
-	brcc time	; если небыло перехода в отрицательные значения, то 
+	brcc time	; если не было перехода в отрицательные значения, то 
 				; перейти на метку "time"
 	; Если отняли 1 от 0, то обнулить таймер:
 	ldi timeL, LOW(day)
@@ -128,22 +135,15 @@
     ; rcall ... ; вызов записи в eeprom и др.
 
     time:
-	; Запись в ОЗУ
-	st x, timeHH
-	st -x, timeH
-	st -x, timeL
-	; возвращаем адрес
+		; Запись в ОЗУ
+		st x, timeHH
+		st -x, timeH
+		st -x, timeL
+		; возвращаем адрес
+		;ldi r26, RAMbeg + 3	; можно переместить на требуемое место	
 	;ldi r26, RAMbeg + 3	; можно переместить на требуемое место
+		;ldi r26, RAMbeg + 3	; можно переместить на требуемое место	
 
-	;; Проверка окончания суток: (del)
-	;cpi timeL, 0	; сравнить
-	;brne time	;	перейти на метку "time", если не равны
-	;cpi timeH, 0
-	;brne time
-	;cpi timeHH, 0
-	;brne time
-	
-	
 
     ;____________________________________________________________________
 	; testing | тестовое мигание светодиодом
@@ -152,7 +152,8 @@
     ; address in RAM for blinking by LED | адрес для этой операции в ОЗУ
     ;clr r27
     ; можно пропустить, так как адрес уже установлен предыдущей загрузкой
-    ldi r26, RAMbeg + 3 ; - after timer's bytes | после байтов таймера
+    .set next_RAM = next_RAM + 3
+	ldi r26, RAMbeg + next_RAM ; - after timer's bytes | после байтов таймера
     ; удобнее сравнить сначала старшие (H), значит и хранить так
     ; нужно инициализировать [ ]
     ld tcomp, x+
@@ -183,13 +184,84 @@
     sbci tcomp, BYTE3(blink_delay)
     st x, tcomp
     ; при переходе через ноль?
-    ;brlo fix   ; [ ]
-
+    ;brlo fix   ; [~]
+	brcc tim_rou_1	; если не было перехода в отрицательные значения, то 
+				; перейти на метку "not_update_blink_delay"/"tim_rou_1"
+	; отнять от (time - blink_delay) дельту между ffffff и day
+	ldi r26, RAMbeg + 3
+	ld tcomp, x
+    subi tcomp, LOW($ffffff - day)
+    st x, tcomp
+    ld tcomp, -x
+    sbci tcomp, BYTE2($ffffff - day)
+    st x, tcomp
+    ld tcomp, -x
+    sbci tcomp, BYTE3($ffffff - day)
+    st x, tcomp
+	;not_update_blink_delay:
     tim_rou_1:
     ; *адрес потерян
 
     ;sei    ; устанавливается сам?
 ;reti   ; to ad after macro | добавить после макроса
+.endmacro
+
+.macro new_t_routine	; @0 - lbl of rou
+	;LOCAL skip_tim_rou { }
+	.set next_RAM = next_RAM + 3
+	ldi r26, RAMbeg + next_RAM
+	rcall event_comp
+	;brtc @0	; @0 - метка, для пропуска выполнения кода ПП
+	brtc @0
+	
+
+.endmacro
+
+.macro end_t_routine	; @0 - lbl of rou, @1 - delay, <add init [ ]
+
+	; обновление переменных в ОЗУ
+    ld tcomp, x
+    subi tcomp, LOW(@1)
+    st x, tcomp
+    ld tcomp, -x
+    sbci tcomp, BYTE2(@1)
+    st x, tcomp
+    ld tcomp, -x
+    sbci tcomp, BYTE3(@1)
+    st x, tcomp
+    ; при переходе через ноль
+	brcc tim_rou_1	; если не было перехода в отрицательные значения, то 
+				; перейти на метку 
+	; отнять от (time - @1) дельту между ffffff и day
+	ldi r26, RAMbeg + 3
+	ld tcomp, x
+    subi tcomp, LOW($ffffff - day)
+    st x, tcomp
+    ld tcomp, -x
+    sbci tcomp, BYTE2($ffffff - day)
+    st x, tcomp
+    ld tcomp, -x
+    sbci tcomp, BYTE3($ffffff - day)
+    st x, tcomp
+
+	@0:
+.endmacro
+
+.macro timer_calls
+	; сравнение содержимого таймера и отсечки события
+	event_comp:
+		ld tcomp, x+
+		cp tcomp, timeHH
+		brne event_comp_skip
+		ld tcomp, x+
+		cp tcomp, timeH
+		brne event_comp_skip
+		ld tcomp, x
+		cp tcomp, timeL
+		brne event_comp_skip
+			set	; set flag T
+		event_comp_skip:
+	ret
 .endmacro
 
 .macro old_timer_m

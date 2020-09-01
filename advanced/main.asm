@@ -56,6 +56,8 @@ timer_var r23, r24, r25, r16, r22
 ; CODE SEGMENT
 ;====================================================================
 
+timer_calls
+
 EXT_INT0: ;________________________________
 	; noise reduction:
 	
@@ -87,6 +89,15 @@ reti
 TIM_OVF0: ;________________________________
 	;old_timer_m
 	timer_m
+	new_t_routine lbl1
+		; включение/отключение светодиода каждый вызов
+		ldi tcomp, 2    ; маска, по которой будет происходить операция XOR
+		mov r4, tcomp	; хранится в r4
+		in tcomp, portB
+		eor tcomp, r4
+		out portB, tcomp
+	end_t_routine lbl1 90
+
 reti
 
 ;_____________________
