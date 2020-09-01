@@ -29,6 +29,12 @@
 
     .equ RAMbeg = $60   ; the beginning of RAM address | адрес начала ОЗУ
     .equ blink_delay = 61   ; ~ 1s
+
+	.equ init_time = day - $10000
+	; вместо 255:255:254 должны устанавливаться нулевые значения полного круга
+	; минус текущее время	[ ] (connected)
+
+	.equ init_blink_delay = init_time - blink_delay
 .endmacro
 
 .macro old_timer_var
@@ -59,11 +65,11 @@
     ; general timer init ; set a time [ ]
 	clr r27
     ldi r26, RAMbeg
-    ldi tcomp, 255  ; @0 - рассчитать из HH:MM:SS -> HH:H:L		[ ] исправить инициализацию
+    ldi tcomp, LOW(init_time)  ; @0 - рассчитать из HH:MM:SS -> HH:H:L		[ ] исправить инициализацию (co)
     st x+, tcomp	; TL = 255
-	ldi tcomp, 255
+	ldi tcomp, BYTE2(init_time)
     st x+, tcomp	; TH = 255
-	ldi tcomp, 254
+	ldi tcomp, BYTE3(init_time)
     st x+, tcomp	; THH = 254
 	; вместо 255:255:254 должны устанавливаться нулевые значения полного круга
 	; минус текущее время	[ ] (connected)
@@ -72,13 +78,13 @@
 	; т.е. сутки	-
 
     ; blink init ; убедиться в правильности/удобности порядка [ ]
-    ld tcomp, x+
-    subi tcomp, 254 - BYTE3(blink_delay)
+	; сначала загружаем старший байт, после вычисления его значения
+	; нельзя считать отдельно, т.к. не учитывается перенос!
+    ldi tcomp, BYTE3(init_blink_delay)
     st x+, tcomp
-    ld tcomp, x+
-    sbci tcomp, 255 - BYTE2(blink_delay)
+    ldi tcomp, BYTE2(init_blink_delay)
     st x+, tcomp
-    ldi tcomp, 255 - LOW(blink_delay)
+    ldi tcomp, LOW(init_blink_delay)
     st x+, tcomp
 .endmacro
 
@@ -109,35 +115,44 @@
 	subi timeL, 1	; согласно doc dec не изменяет C, проверить синонимичность { }
 	sbci timeH, 0	; отнять с остатком (отнимет 1 только при переходе через ноль)
 	sbci timeHH, 0
+	; проверка окончания суток (вместо пред. констр.):
+	;brlo time	; елси отняли 1 от 0, то перейти на метку "time" 
+	brcc time	; если небыло перехода в отрицательные значения, то 
+				; перейти на метку "time"
+	; Если отняли 1 от 0, то обнулить таймер:
+	ldi timeL, LOW(day)
+	ldi timeH, BYTE2(day)
+	ldi timeHH, BYTE3(day)
+	; Проверить правильность сброса таймера [ ]:
+    ; обновить значения сравниваемых с таймером значений
+    ; rcall ... ; вызов записи в eeprom и др.
+
+    time:
 	; Запись в ОЗУ
 	st x, timeHH
 	st -x, timeH
 	st -x, timeL
 	; возвращаем адрес
-	ldi r26, RAMbeg + 3	; можно переместить на требуемое место
+	;ldi r26, RAMbeg + 3	; можно переместить на требуемое место
 
-	; Проверка окончания суток:
-	cpi timeL, LOW(day)	; сравнить
-	brne time	;	перейти на метку "time", если не равны
-	cpi timeH, BYTE2(day)
-	brne time
-	cpi timeH, BYTE3(day)
-	brne time
-	; Проверить правильность сброса таймера [ ]:
-    ; обновить значения сравниваемых с таймером значений
-    ; rcall ... ; вызов записи в eeprom и др.
-	ldi timeL, 255
-	ldi timeH, 255
-	ldi timeHH, 255
+	;; Проверка окончания суток: (del)
+	;cpi timeL, 0	; сравнить
+	;brne time	;	перейти на метку "time", если не равны
+	;cpi timeH, 0
+	;brne time
+	;cpi timeHH, 0
+	;brne time
+	
+	
 
-    time:
-
-    ; testing | тестовое мигание светодиодом
+    ;____________________________________________________________________
+	; testing | тестовое мигание светодиодом
+	;____________________________________________________________________
     ; (?) Проверяем, настало ли время действовать
     ; address in RAM for blinking by LED | адрес для этой операции в ОЗУ
     ;clr r27
     ; можно пропустить, так как адрес уже установлен предыдущей загрузкой
-    ;ldi r26, RAMbeg + 3 ; - after timers bytes | после байтов таймера
+    ldi r26, RAMbeg + 3 ; - after timer's bytes | после байтов таймера
     ; удобнее сравнить сначала старшие (H), значит и хранить так
     ; нужно инициализировать [ ]
     ld tcomp, x+
@@ -152,7 +167,7 @@
 
     ; включение/отключение светодиода каждый вызов
     ldi tcomp, 1    ; маска, по которой будет происходить операция XOR
-    mov r4, tcomp
+    mov r4, tcomp	; хранится в r4
     in tcomp, portB
     eor tcomp, r4
     out portB, tcomp

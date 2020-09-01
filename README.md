@@ -38,3 +38,7 @@ _\* общий вывод = GND_
 
 
 _tstu-no@inbox.ru_
+
+---
+
+[todo list](/todo.md)
