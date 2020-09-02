@@ -89,12 +89,13 @@
     ldi tcomp, LOW(init_blink_delay)
     st x+, tcomp
 
+
 	ldi tcomp, BYTE3(init_time - 90)
     st x+, tcomp
     ldi tcomp, BYTE2(init_time - 90)
     st x+, tcomp
     ldi tcomp, LOW(init_time - 90)
-    st x+, tcomp
+    st x+, tcomp	; почему-то удалял?
 .endmacro
 
 .macro timer_m
@@ -221,13 +222,13 @@
 
 	; обновление переменных в ОЗУ
     ld tcomp, x
-    subi tcomp, LOW(@1)
+    subi tcomp, LOW(@0)
     st x, tcomp
     ld tcomp, -x
-    sbci tcomp, BYTE2(@1)
+    sbci tcomp, BYTE2(@0)
     st x, tcomp
     ld tcomp, -x
-    sbci tcomp, BYTE3(@1)
+    sbci tcomp, BYTE3(@0)
     st x, tcomp
     ; при переходе через ноль
 	brcc tim_rou_1	; если не было перехода в отрицательные значения, то 
@@ -243,13 +244,12 @@
     ld tcomp, -x
     sbci tcomp, BYTE3($ffffff - day)
     st x, tcomp
-
-	@0:
+	tim_rou_1:
 .endmacro
 
 .macro timer_calls
 	; сравнение содержимого таймера и отсечки события
-	event_comp:
+	;event_comp:
 		ld tcomp, x+
 		cp tcomp, timeHH
 		brne event_comp_skip
