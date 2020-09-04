@@ -56,27 +56,11 @@ timer_var r23, r24, r25, r16, r22
 ; CODE SEGMENT
 ;====================================================================
 
-event_comp:
+; calls
+event_comp: event_comp_m
+zerro_correction: zerro_correction_m
 
-;; сравнение содержимого таймера и отсечки события
-;	;event_comp:
-;		clt	; снятие флага перед использованием
-;
-;		ld tcomp, x+
-;		cp tcomp, timeHH
-;		brne event_comp_skip
-;		ld tcomp, x+
-;		cp tcomp, timeH
-;		brne event_comp_skip
-;		ld tcomp, x
-;		cp tcomp, timeL
-;		brne event_comp_skip
-;			set	; set flag T
-;		event_comp_skip:
-;	ret
-
-; попробую скопировать из макросов наверх^
-timer_calls
+null_rou_time_init: null_rou_time_init_m
 
 EXT_INT0: ;________________________________
 	; noise reduction:
@@ -109,53 +93,6 @@ reti
 TIM_OVF0: ;________________________________
 	;old_timer_m
 	timer_m
-;	.set next_RAM = next_RAM + 3
-;	ldi r26, RAMbeg + next_RAM
-;	rcall event_comp
-;		; пропускает лишь раз, почему? [x] флаг
-;	;brtc @0	; @0 - метка, для пропуска выполнения кода ПП
-;	brtc lbl2
-;	;clt	; снятие флага после использования (или снять до, в call)
-;
-;	; включение/отключение светодиода каждый вызов
-;		ldi tcomp, 2    ; маска, по которой будет происходить операция XOR
-;		mov r4, tcomp	; хранится в r4
-;		in tcomp, portB
-;		eor tcomp, r4
-;		out portB, tcomp
-;
-;	.set const1 = 30
-;	; обновление переменных в ОЗУ
-;    ld tcomp, x
-;    subi tcomp, LOW(const1)
-;    st x, tcomp
-;    ld tcomp, -x
-;    sbci tcomp, BYTE2(const1)
-;    st x, tcomp
-;    ld tcomp, -x
-;    sbci tcomp, BYTE3(const1)
-;    st x, tcomp
-;    ; при переходе через ноль
-;	brcc tim_rou_1	; если не было перехода в отрицательные значения, то 
-;				; перейти на метку 
-;	; отнять от (time - @1) дельту между ffffff и day
-;	ldi r26, RAMbeg + 3
-;	ld tcomp, x
-;    subi tcomp, LOW($ffffff - day)
-;    st x, tcomp
-;    ld tcomp, -x
-;    sbci tcomp, BYTE2($ffffff - day)
-;    st x, tcomp
-;    ld tcomp, -x
-;    sbci tcomp, BYTE3($ffffff - day)
-;    st x, tcomp
-;	tim_rou_1:
-;	lbl2:
-;reti
-
-
-
-; попробую скопировать из макросов наверх^
 	new_t_routine lbl1
 		; включение/отключение светодиода каждый вызов
 		ldi tcomp, 2    ; маска, по которой будет происходить операция XOR
@@ -166,10 +103,23 @@ TIM_OVF0: ;________________________________
 	end_t_routine 90
 	lbl1:
 
+	new_t_routine lbl2
+		; включение/отключение светодиода каждый вызов
+		ldi tcomp, 1 << 2    ; маска, по которой будет происходить операция XOR
+		mov r4, tcomp	; хранится в r4
+		in tcomp, portB
+		eor tcomp, r4
+		out portB, tcomp
+	end_t_routine 30
+	lbl2:
+
 reti
 
 ;_____________________
 Start: ;_____________________________RESET:__________________________
+
+	ldi temp, RAMend	; init stack
+	out SPL, temp
 
 ; timers
 	; t0
@@ -208,9 +158,6 @@ Start: ;_____________________________RESET:__________________________
 	clr setStatus
 	clr mode
 
-	
-	ldi temp, RAMend	; init stack
-	out SPL, temp
 	
 	;  на всякий случай, для переменных таймера, очищаем 2 ячейки стека
 	clr temp

@@ -89,13 +89,36 @@
     ldi tcomp, LOW(init_blink_delay)
     st x+, tcomp
 
-
+	; автоматизировать инициализацию ПП [ ]
 	ldi tcomp, BYTE3(init_time - 90)
     st x+, tcomp
     ldi tcomp, BYTE2(init_time - 90)
     st x+, tcomp
     ldi tcomp, LOW(init_time - 90)
     st x+, tcomp	; почему-то удалял?
+
+;	ldi tcomp, BYTE3(init_time - 30)
+;    st x+, tcomp
+;    ldi tcomp, BYTE2(init_time - 30)
+;    st x+, tcomp
+;    ldi tcomp, LOW(init_time - 30)
+;    st x+, tcomp	; почему-то удалял?
+
+	; нулевая инициализация не работает, минимум - 1
+	; несколько раз:
+	rcall null_rou_time_init
+	rcall null_rou_time_init
+.endmacro
+
+.macro null_rou_time_init_m
+	; Запускать по умолчанию со второго прерывания
+	ldi tcomp, BYTE3(init_time - 1)
+    st x+, tcomp
+    ldi tcomp, BYTE2(init_time - 1)
+    st x+, tcomp
+    ldi tcomp, LOW(init_time - 1)
+    st x+, tcomp
+	ret
 .endmacro
 
 .macro timer_m
@@ -221,6 +244,7 @@
 .macro end_t_routine	; @0 - lbl of rou, @1 - delay, <add init [ ]
 
 	; обновление переменных в ОЗУ
+	; возможно реализовать вызываемую пп с константой в регистрах...
     ld tcomp, x
     subi tcomp, LOW(@0)
     st x, tcomp
@@ -233,23 +257,15 @@
     ; при переходе через ноль
 	brcc tim_rou_1	; если не было перехода в отрицательные значения, то 
 				; перейти на метку 
-	; отнять от (time - @1) дельту между ffffff и day
-	ldi r26, RAMbeg + 3
-	ld tcomp, x
-    subi tcomp, LOW($ffffff - day)
-    st x, tcomp
-    ld tcomp, -x
-    sbci tcomp, BYTE2($ffffff - day)
-    st x, tcomp
-    ld tcomp, -x
-    sbci tcomp, BYTE3($ffffff - day)
-    st x, tcomp
+	; отнять от (time - @0) дельту между ffffff и day
+		ldi r26, RAMbeg + next_RAM
+		rcall zerro_correction
 	tim_rou_1:
 .endmacro
 
-.macro timer_calls
+.macro event_comp_m
 	; сравнение содержимого таймера и отсечки события
-	;event_comp:
+	event_comp:
 		clt	; снятие флага перед использованием
 		ld tcomp, x+
 		cp tcomp, timeHH
@@ -265,230 +281,246 @@
 	ret
 .endmacro
 
+.macro zerro_correction_m
+	zerro_correction:
+		;ldi r26, RAMbeg + next_RAM	; не будет здесь работать (т.к. nR меняется)
+		ld tcomp, x
+		subi tcomp, LOW($ffffff - day)
+		st x, tcomp
+		ld tcomp, -x
+		sbci tcomp, BYTE2($ffffff - day)
+		st x, tcomp
+		ld tcomp, -x
+		sbci tcomp, BYTE3($ffffff - day)
+		st x, tcomp
+		tim_rou_1:
+	ret
+.endmacro
+
 .macro old_timer_m
-    cli	; int off
-	
-	; for stack usage:
-	;pop r5			; предположительно - PC, pointer
-	; in temp, sreg	; status reg saving
-	; push temp
-	
-	; general timer
-	subi timeL, 1
-	;brne time	; перейти на метку "time", если не было перехода через ноль
-	sbci timeH, 0	; отнять с остатком (отнимет 1 только при переходе через ноль)
-	;brne time
-	sbci timeHH, 0
-	; Проверка окончания суток:
-	cpi timeL, LOW(day)	; сравнить
-	brne time	;	перейти на метку "time", если не равны
-	cpi timeH, BYTE2(day)
-	brne time
-	cpi timeH, BYTE3(day)
-	brne time
-	; Проверить правильность сброса таймера [ ]:
-	ldi timeL, 255
-	ldi timeH, 255
-	ldi timeHH, 255
+		cli	; int off
+		
+		; for stack usage:
+		;pop r5			; предположительно - PC, pointer
+		; in temp, sreg	; status reg saving
+		; push temp
+		
+		; general timer
+		subi timeL, 1
+		;brne time	; перейти на метку "time", если не было перехода через ноль
+		sbci timeH, 0	; отнять с остатком (отнимет 1 только при переходе через ноль)
+		;brne time
+		sbci timeHH, 0
+		; Проверка окончания суток:
+		cpi timeL, LOW(day)	; сравнить
+		brne time	;	перейти на метку "time", если не равны
+		cpi timeH, BYTE2(day)
+		brne time
+		cpi timeH, BYTE3(day)
+		brne time
+		; Проверить правильность сброса таймера [ ]:
+		ldi timeL, 255
+		ldi timeH, 255
+		ldi timeHH, 255
 
-	time:
+		time:
 
-	; modes
-	; 1	- 4 x 25
-	cpi mode, 1
-	breq mode_1
-	cpi mode, 3
-	breq mode_1
-	cpi mode, 5
-	breq mode_1
-	cpi mode, 7
-	breq mode_1
-	; 2 - 3 x 5
-	cpi mode, 2
-	breq mode_2
-	cpi mode, 4
-	breq mode_2
-	cpi mode, 6
-	breq mode_2
-	; 3 - 1 x 15
-	cpi mode, 8
-	breq mode_3		; out of rich [ ] to fix
-	; else (if mode not 0):
-	cpi mode, 0
-	breq mode_0
-	;sbrc SREG, Z	; bit1 in sreg	; [+] replace, doesn't work
-	ldi bmode, 1	; reset bmode, if mode == 0: skip
-	mode_0:
+		; modes
+		; 1	- 4 x 25
+		cpi mode, 1
+		breq mode_1
+		cpi mode, 3
+		breq mode_1
+		cpi mode, 5
+		breq mode_1
+		cpi mode, 7
+		breq mode_1
+		; 2 - 3 x 5
+		cpi mode, 2
+		breq mode_2
+		cpi mode, 4
+		breq mode_2
+		cpi mode, 6
+		breq mode_2
+		; 3 - 1 x 15
+		cpi mode, 8
+		breq mode_3		; out of rich [ ] to fix
+		; else (if mode not 0):
+		cpi mode, 0
+		breq mode_0
+		;sbrc SREG, Z	; bit1 in sreg	; [+] replace, doesn't work
+		ldi bmode, 1	; reset bmode, if mode == 0: skip
+		mode_0:
 
 
-	
-	
-	;push r5		; перенесено выше, т.к. в прот.случае придется повторять в ветках
-	
-	mov temp, setStatus
-	; int0 noise skiping, falling
-	cpi temp, 1
-	breq tim0_int0_1
-	cpi temp, 2
-	breq tim0_int0_2
-	; int0 noise skiping, rising
-	cpi temp, 4
-	breq tim0_int0_4
-	cpi temp, 5
-	breq tim0_int0_5
+		
+		
+		;push r5		; перенесено выше, т.к. в прот.случае придется повторять в ветках
+		
+		mov temp, setStatus
+		; int0 noise skiping, falling
+		cpi temp, 1
+		breq tim0_int0_1
+		cpi temp, 2
+		breq tim0_int0_2
+		; int0 noise skiping, rising
+		cpi temp, 4
+		breq tim0_int0_4
+		cpi temp, 5
+		breq tim0_int0_5
 
-	mov setStatus, temp
-	
-	sei
-reti
-	tim0_int0_1:
-		inc temp
 		mov setStatus, temp
-		sei
-reti
-	tim0_int0_2:
-		inc temp
-		mov setStatus, temp
-		; rising int:
-		tout	MCUCR,	MCUCR_pint0r
-		sei
-reti
-	tim0_int0_4:
-		inc temp
-		mov setStatus, temp
-		sei
-reti
-	tim0_int0_5:
-		clr temp	; first state
-		mov setStatus, temp
-		; faling int:
-		tout	MCUCR,	MCUCR_pint0f
-		sei
-reti
-	mode_1:	; 3s + LED	;to macro
-		mov r4, temp	; saving temp
-		clr temp
 		
-		; LEDs on
-		;cbi Portb, green_pnum	; LED2 off
-		sbi Portb, red_pnum		; LED1 on
-	
-		;inc countL	 ; not work for this (theory: it is subi -1)
-		ldi one, 1
-		add countL, one		; true +1
-		adc countH, temp	; +carry	(temp = 0)
-		adc countHH, temp
+		sei
+	reti
+		tim0_int0_1:
+			inc temp
+			mov setStatus, temp
+			sei
+	reti
+		tim0_int0_2:
+			inc temp
+			mov setStatus, temp
+			; rising int:
+			tout	MCUCR,	MCUCR_pint0r
+			sei
+	reti
+		tim0_int0_4:
+			inc temp
+			mov setStatus, temp
+			sei
+	reti
+		tim0_int0_5:
+			clr temp	; first state
+			mov setStatus, temp
+			; faling int:
+			tout	MCUCR,	MCUCR_pint0f
+			sei
+	reti
+		mode_1:	; 3s + LED	;to macro
+			mov r4, temp	; saving temp
+			clr temp
+			
+			; LEDs on
+			;cbi Portb, green_pnum	; LED2 off
+			sbi Portb, red_pnum		; LED1 on
+		
+			;inc countL	 ; not work for this (theory: it is subi -1)
+			ldi one, 1
+			add countL, one		; true +1
+			adc countH, temp	; +carry	(temp = 0)
+			adc countHH, temp
 
+			
+			cpi countHH, tim_m1HH
+			brne notatime_1;endoftim
+			cpi countH, tim_m1H
+			brne notatime_1;endoftim
+			cpi countL, tim_m1L
+			brne notatime_1
+			; it's the time:
+			ldi countL, 0
+			ldi countH, 0
+			clr countHH
+			
+			; LEDs off
+			cbi Portb, red_pnum	; LED off
+			
+			ldi mode, 0
+			inc bmode	; next - mode 2, 4, 6...
+			
+			notatime_1:
+			
+			mov temp, r4	; temp recovery
+			sei
+	reti
+		mode_2:
+		rjmp mode_2j
+		mode_3:
+		rjmp mode_3j
+		; ldi r30, LOW(mode_3j)
+		; ldi r31, HIGH(mode_3j)
+		; ijmp	; переход по адресу в rZ(jump to address in rZ)
+		mode_2j:	; 1s + other LED
+			mov r4, temp	; saving temp
+			clr temp
+			
+			; LEDs
+			;cbi Portb, red_pnum		; LED1 off
+			sbi Portb, green_pnum	; LED2 on
 		
-		cpi countHH, tim_m1HH
-		brne notatime_1;endoftim
-		cpi countH, tim_m1H
-		brne notatime_1;endoftim
-		cpi countL, tim_m1L
-		brne notatime_1
-		; it's the time:
-		ldi countL, 0
-		ldi countH, 0
-		clr countHH
+			;inc countL	 ; not work for this (theory: it is subi -1)
+			ldi one, 1
+			add countL, one		; true +1
+			adc countH, temp	; +carry	(temp = 0)
+			
+			cpi countHH, tim_m2HH
+			brne notatime_2
+			cpi countH, tim_m2H
+			brne notatime_2;endoftim
+			cpi countL, tim_m2L
+			brne notatime_2
+			; it's the time:
+			ldi countL, 0
+			ldi countH, 0
+			clr countHH	; L, H, HH = 0
+			
+			; LEDs off
+			cbi Portb, green_pnum	; LED off
+			
+			ldi mode, 0	; возврат режима 0
+			inc bmode	; next - mode 3, 5, etc.
+			
+			notatime_2:
+			
+			mov temp, r4	; temp recovery
+			sei
+	reti
+		mode_3j:
+			mov r4, temp	; saving temp
+			clr temp
+			
+			; LEDs
+			;cbi Portb, red_pnum		; LED1 off
+			sbi Portb, green_pnum	; LED2 on
 		
-		; LEDs off
-		cbi Portb, red_pnum	; LED off
-		
-		ldi mode, 0
-		inc bmode	; next - mode 2, 4, 6...
-		
-		notatime_1:
-		
-		mov temp, r4	; temp recovery
-		sei
-reti
-	mode_2:
-	rjmp mode_2j
-	mode_3:
-	rjmp mode_3j
-	; ldi r30, LOW(mode_3j)
-	; ldi r31, HIGH(mode_3j)
-	; ijmp	; переход по адресу в rZ(jump to address in rZ)
-	mode_2j:	; 1s + other LED
-		mov r4, temp	; saving temp
-		clr temp
-		
-		; LEDs
-		;cbi Portb, red_pnum		; LED1 off
-		sbi Portb, green_pnum	; LED2 on
-	
-		;inc countL	 ; not work for this (theory: it is subi -1)
-		ldi one, 1
-		add countL, one		; true +1
-		adc countH, temp	; +carry	(temp = 0)
-		
-		cpi countHH, tim_m2HH
-		brne notatime_2
-		cpi countH, tim_m2H
-		brne notatime_2;endoftim
-		cpi countL, tim_m2L
-		brne notatime_2
-		; it's the time:
-		ldi countL, 0
-		ldi countH, 0
-		clr countHH	; L, H, HH = 0
-		
-		; LEDs off
-		cbi Portb, green_pnum	; LED off
-		
-		ldi mode, 0	; возврат режима 0
-		inc bmode	; next - mode 3, 5, etc.
-		
-		notatime_2:
-		
-		mov temp, r4	; temp recovery
-		sei
-reti
-	mode_3j:
-		mov r4, temp	; saving temp
-		clr temp
-		
-		; LEDs
-		;cbi Portb, red_pnum		; LED1 off
-		sbi Portb, green_pnum	; LED2 on
-	
-		;inc countL	 ; not work for this (theory: it is subi -1)
-		ldi one, 1
-		add countL, one		; true +1
-		adc countH, temp	; +carry	(temp = 0)
-		
-		;add temp_blink, one
-		;cpi temp_blink, s1
-		;brlo skip_bl
-		;cbi Portb, green_pnum
-		;skip_bl:
-		;cpi temp_blink, s1 * 2
-		;brlo skip_bl2
-		;sbi portB, green_pnum
-		;skip_bl2:
+			;inc countL	 ; not work for this (theory: it is subi -1)
+			ldi one, 1
+			add countL, one		; true +1
+			adc countH, temp	; +carry	(temp = 0)
+			
+			;add temp_blink, one
+			;cpi temp_blink, s1
+			;brlo skip_bl
+			;cbi Portb, green_pnum
+			;skip_bl:
+			;cpi temp_blink, s1 * 2
+			;brlo skip_bl2
+			;sbi portB, green_pnum
+			;skip_bl2:
 
 
-		cpi countHH, tim_m3HH
-		brne notatime_3
-		cpi countH, tim_m3H
-		brne notatime_3;endoftim
-		cpi countL, tim_m3L
-		brne notatime_3
-		; it's the time:
-		ldi countL, 0
-		ldi countH, 0
-		clr countHH	; L, H, HH = 0
-		
-		; LEDs off
-		cbi Portb, green_pnum	; LED off
-		
-		ldi mode, 0	; возврат режима 0
-		inc bmode	; next - mode 3, 5, etc.
-		
-		notatime_3a:
-		notatime_3:
-		
-		mov temp, r4	; temp recovery
-		sei
-reti
+			cpi countHH, tim_m3HH
+			brne notatime_3
+			cpi countH, tim_m3H
+			brne notatime_3;endoftim
+			cpi countL, tim_m3L
+			brne notatime_3
+			; it's the time:
+			ldi countL, 0
+			ldi countH, 0
+			clr countHH	; L, H, HH = 0
+			
+			; LEDs off
+			cbi Portb, green_pnum	; LED off
+			
+			ldi mode, 0	; возврат режима 0
+			inc bmode	; next - mode 3, 5, etc.
+			
+			notatime_3a:
+			notatime_3:
+			
+			mov temp, r4	; temp recovery
+			sei
+	reti
 .endmacro
