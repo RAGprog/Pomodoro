@@ -250,6 +250,7 @@
 .macro timer_calls
 	; сравнение содержимого таймера и отсечки события
 	;event_comp:
+		clt	; снятие флага перед использованием
 		ld tcomp, x+
 		cp tcomp, timeHH
 		brne event_comp_skip
