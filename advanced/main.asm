@@ -27,6 +27,12 @@ testmode 1 ; 1 = test mode (3s), 0 = prod. mode (25min)
 ;====================================================================
 .def temp = r16
 
+.def act_flags = r17	; 0 - noiseT
+; act_flags's bits:
+.equ noiseT = 0
+.equ noiseT_release = 1
+.equ RedT = 2  ; Зажеч светодиод после отпускания кнопки
+
 ;.def setStatus = r2
 ;.def mode = r21	; 1 = 1s, 2 = 3s
 ;.def bmode = r22	; modes for button
@@ -63,6 +69,11 @@ zerro_correction: zerro_correction_m
 null_rou_time_init: null_rou_time_init_m
 
 EXT_INT0: ;________________________________
+	; set noise timer flag
+	set
+	bld act_flags, noiseT   ; bit load, бит задержки против шума в рег.флагов
+reti
+;old:
 	; noise reduction:
 	
 ;	mov temp, setStatus
@@ -95,7 +106,7 @@ TIM_OVF0: ;________________________________
 	timer_m
 	new_t_routine lbl1
 		; включение/отключение светодиода каждый вызов
-		ldi tcomp, 2    ; маска, по которой будет происходить операция XOR
+		ldi tcomp, 1 << 6    ; маска, по которой будет происходить операция XOR
 		mov r4, tcomp	; хранится в r4
 		in tcomp, portB
 		eor tcomp, r4
@@ -105,7 +116,7 @@ TIM_OVF0: ;________________________________
 
 	new_t_routine lbl2
 		; включение/отключение светодиода каждый вызов
-		ldi tcomp, 1 << 2    ; маска, по которой будет происходить операция XOR
+		ldi tcomp, 1 << 7    ; маска, по которой будет происходить операция XOR
 		mov r4, tcomp	; хранится в r4
 		in tcomp, portB
 		eor tcomp, r4
@@ -113,7 +124,45 @@ TIM_OVF0: ;________________________________
 	end_t_routine 30
 	lbl2:
 
+	; skip if noiseT flag not set    |  Пропустить, если флаг noiseT не установлен
+	sbrc act_flags, noiseT  ;
+	rcall button	; нужен ли ...
+	sbrc act_flags, RedT
+	rcall red_delay
+
 reti
+
+red_delay:
+	new_t_routine lbl3
+		cbi portB, red_pnum
+		clt
+		bld act_flags, RedT ; флаг ожидания для СД
+	end_t_routine 90
+	lbl3:
+ret
+
+button:
+	clt
+	bld act_flags, noiseT
+	; две ветви действия: нажатие и отпускание
+	sbrc act_flags, noiseT_release  ; fix
+	rjmp button_release	; rcall не подходит (возврат)
+	;rjmp button_press
+button_press:
+	set
+	bld act_flags, noiseT_release
+	tout	MCUCR,	MCUCR_pint0r
+ret
+button_release:
+ 	clt
+ 	bld act_flags, noiseT_release
+	tout	MCUCR,	MCUCR_pint0f    ; проверить [~]
+
+	set
+	bld act_flags, RedT ; флаг ожидания для СД
+	sbi portB, red_pnum	; изменение, относительно Att13, проверить там [ ]
+ret
+
 
 ;_____________________
 Start: ;_____________________________RESET:__________________________
@@ -131,9 +180,6 @@ Start: ;_____________________________RESET:__________________________
 	tout	TIMSK,	1 << TOIE1 |	0 << OCIE1A |	0 << TICIE1 |	1 << TOIE0
 
 	; general timer init ; set a time [ ]
-	;ldi timeL, 255
-	;ldi timeH, 255
-	;ldi timeHH, 255
 	timer_var_init
 
 ; pins int

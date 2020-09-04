@@ -191,7 +191,7 @@
     brne tim_rou_1
 
     ; включение/отключение светодиода каждый вызов
-    ldi tcomp, 1    ; маска, по которой будет происходить операция XOR
+    ldi tcomp, 1 << 5	; маска, по которой будет происходить операция XOR
     mov r4, tcomp	; хранится в r4
     in tcomp, portB
     eor tcomp, r4
@@ -269,13 +269,13 @@
 		clt	; снятие флага перед использованием
 		ld tcomp, x+
 		cp tcomp, timeHH
-		brne event_comp_skip
+		brlo event_comp_skip	; brne to brlo, fix missings
 		ld tcomp, x+
 		cp tcomp, timeH
-		brne event_comp_skip
+		brlo event_comp_skip
 		ld tcomp, x
 		cp tcomp, timeL
-		brne event_comp_skip
+		brlo event_comp_skip
 			set	; set flag T
 		event_comp_skip:
 	ret
