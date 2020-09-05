@@ -129,6 +129,7 @@ TIM_OVF0: ;________________________________
 	rcall button	; нужен ли ...
 	sbrc act_flags, RedT
 	rcall red_delay
+	; где-то обнулить таймер
 
 reti
 
@@ -149,6 +150,28 @@ button:
 	rjmp button_release	; rcall не подходит (возврат)
 	;rjmp button_press
 button_press:
+	; обнуление
+	ldi r26, RAMbeg
+	;end_t_routine 90
+	;ldi r26, RAMbeg + next_RAM
+	ld temp, x
+    subi temp, LOW(90)
+	ldi r26, RAMbeg + next_RAM + 2
+    st x, temp
+
+	ldi r26, RAMbeg + 1
+    ld temp, x
+    sbci temp, BYTE2(90)
+	ldi r26, RAMbeg + next_RAM + 1
+    st x, temp
+
+	ldi r26, RAMbeg + 2
+    ld temp, x
+    sbci temp, BYTE3(90)
+	ldi r26, RAMbeg + next_RAM
+    st x, temp
+	ldi r26, RAMbeg + next_RAM + 2
+
 	set
 	bld act_flags, noiseT_release
 	tout	MCUCR,	MCUCR_pint0r
