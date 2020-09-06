@@ -151,6 +151,7 @@ button:
 	;rjmp button_press
 button_press:
 	; обнуление
+	; Старший байт? (должен быть младший)
 	ldi r26, RAMbeg
 	;end_t_routine 90
 	;ldi r26, RAMbeg + next_RAM

@@ -281,6 +281,30 @@
 	ret
 .endmacro
 
+.macro rou_to_null_m	; @0..2 - LI.. HHI, pre init r26
+	rou_to_null:
+	; время хранится в timeL..HH
+	;mov @0, 
+	sub @0, timeL
+	neg @0
+	sub @1, timeL
+	neg @1
+	sub @2, timeL
+	neg @2
+
+	;ldi r26, RAMbeg + next_RAM ; проверить адрес [ ]
+	st x+, @2
+	st x+, @1
+	st x, @0
+
+.endmacro
+
+.macro load_im	; const
+	ldi @0, LOW(@3)
+	ldi @1, BYTE2(@3)
+	ldi @2, BYTE3(@3)
+.endmacro
+
 .macro zerro_correction_m
 	zerro_correction:
 		;ldi r26, RAMbeg + next_RAM	; не будет здесь работать (т.к. nR меняется)
