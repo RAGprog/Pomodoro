@@ -32,6 +32,9 @@ testmode 1 ; 1 = test mode (3s), 0 = prod. mode (25min)
 .equ noiseT = 0
 .equ noiseT_release = 1
 .equ RedT = 2  ; Зажеч светодиод после отпускания кнопки
+.equ Pom_Count_0 = 3	; Подсчет включений таймера
+.equ Pom_Count_1 = 4	; (max = 2^2 = 4)
+.equ Pom_break_flag = 5	; Следующая задержка - перерыв (5мин)
 
 ;.def setStatus = r2
 ;.def mode = r21	; 1 = 1s, 2 = 3s
@@ -156,19 +159,19 @@ button_press:
 	;end_t_routine 90
 	;ldi r26, RAMbeg + next_RAM
 	ld temp, x
-    subi temp, LOW(90)
+    subi temp, LOW(400)	; M25
 	ldi r26, RAMbeg + next_RAM + 2
     st x, temp
 
 	ldi r26, RAMbeg + 1
     ld temp, x
-    sbci temp, BYTE2(90)
+    sbci temp, BYTE2(400)
 	ldi r26, RAMbeg + next_RAM + 1
     st x, temp
 
 	ldi r26, RAMbeg + 2
     ld temp, x
-    sbci temp, BYTE3(90)
+    sbci temp, BYTE3(400)
 	ldi r26, RAMbeg + next_RAM
     st x, temp
 	ldi r26, RAMbeg + next_RAM + 2
@@ -182,9 +185,21 @@ button_release:
  	bld act_flags, noiseT_release
 	tout	MCUCR,	MCUCR_pint0f    ; проверить [~]
 
+	; включение СД
 	set
 	bld act_flags, RedT ; флаг ожидания для СД
 	sbi portB, red_pnum	; изменение, относительно Att13, проверить там [ ]
+	; счет включений:
+	; загрузка в T
+	bst act_flags, Pom_Count_0	; проверить, не сломалась ли процедура с T
+	bld temp, 0
+	bst act_flags, Pom_Count_1	; проверить, не сломалась ли процедура с T
+	bld temp, 1
+	inc temp
+	sbrc temp, 3	; Skip if Bit in Register Cleared
+	rjmp reset_Pom_Count_and_long_break
+	short_break:
+	; доделать [ ]
 ret
 
 
