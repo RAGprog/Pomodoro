@@ -71,6 +71,8 @@ zerro_correction: zerro_correction_m
 
 null_rou_time_init: null_rou_time_init_m
 
+rou_to_null: rou_to_null_m r18, r19, r20
+
 EXT_INT0: ;________________________________
 	; set noise timer flag
 	set
@@ -200,6 +202,51 @@ button_release:
 	rjmp reset_Pom_Count_and_long_break
 	short_break:
 	; доделать [ ]
+	; загрузка 5м
+	load_im r18, r19, r20, M5
+	ldi r26, RAMbeg + next_RAM
+	rcall rou_to_null
+	; change flags? [ ]
+	; обнуление двух битов счетчика в регистре флагов act_flags
+	andi act_flags, 0b11111111 - (0b11 << Pom_Count_0)	; cbr?
+	; сдвиг счетчика в temp в его позицию в act_flags
+	;clc 
+	.macro log_shift_left 
+		.if @1 > 0
+			lsl @0
+		.endif
+		.if @1 > 1
+			lsl @0
+		.endif
+		.if @1 > 2
+			lsl @0
+		.endif
+		.if @1 > 3
+			lsl @0
+		.endif
+		.if @1 > 4
+			lsl @0
+		.endif
+		.if @1 > 5
+			lsl @0
+		.endif
+		.if @1 > 6
+			lsl @0
+		.endif
+	.endmacro
+	;lsl temp
+	log_shift_left temp, Pom_Count_0
+	; прибавление к РФ act_flags значения счетчика:
+	add act_flags, temp
+ret
+
+	reset_Pom_Count_and_long_break:
+		load_im r18, r19, r20, M25
+		ldi r26, RAMbeg + next_RAM
+		rcall rou_to_null
+		; change flags? [ ]
+		andi act_flags, 0b11111111 - (0b11 << Pom_Count_0)	; cbr?
+
 ret
 
 

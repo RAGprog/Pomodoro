@@ -296,10 +296,27 @@
 	st x+, @2
 	st x+, @1
 	st x, @0
-
+	;pop temp	; попытка сохранить стек
+	;pop @2
+	;pop @1
+	;pop @0
+	;push temp
+	ld @2, x
+	ld @1, -x 
+	ld @0, -x
+	ret
 .endmacro
 
 .macro load_im	; const
+	;pop temp
+	;push @0
+	;push @1
+	;push @2
+	;pop temp
+	ldi r26, $80
+	st @0, x+
+	st @1, x+
+	st @2, x 
 	ldi @0, LOW(@3)
 	ldi @1, BYTE2(@3)
 	ldi @2, BYTE3(@3)
