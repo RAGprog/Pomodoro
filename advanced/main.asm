@@ -155,28 +155,7 @@ button:
 	rjmp button_release	; rcall не подходит (возврат)
 	;rjmp button_press
 button_press:
-	; обнуление
-	; Старший байт? (должен быть младший)
-	ldi r26, RAMbeg
-	;end_t_routine 90
-	;ldi r26, RAMbeg + next_RAM
-	ld temp, x
-    subi temp, LOW(400)	; M25
-	ldi r26, RAMbeg + next_RAM + 2
-    st x, temp
-
-	ldi r26, RAMbeg + 1
-    ld temp, x
-    sbci temp, BYTE2(400)
-	ldi r26, RAMbeg + next_RAM + 1
-    st x, temp
-
-	ldi r26, RAMbeg + 2
-    ld temp, x
-    sbci temp, BYTE3(400)
-	ldi r26, RAMbeg + next_RAM
-    st x, temp
-	ldi r26, RAMbeg + next_RAM + 2
+	; перемещено в б_релиз
 
 	set
 	bld act_flags, noiseT_release
@@ -191,63 +170,132 @@ button_release:
 	set
 	bld act_flags, RedT ; флаг ожидания для СД
 	sbi portB, red_pnum	; изменение, относительно Att13, проверить там [ ]
-	; счет включений:
-	; загрузка в T
-	bst act_flags, Pom_Count_0	; проверить, не сломалась ли процедура с T
-	bld temp, 0
-	bst act_flags, Pom_Count_1	; проверить, не сломалась ли процедура с T
-	bld temp, 1
-	inc temp
-	sbrc temp, 3	; Skip if Bit in Register Cleared
-	rjmp reset_Pom_Count_and_long_break
-	short_break:
-	; доделать [ ]
-	; загрузка 5м
-	load_im r18, r19, r20, M5
-	ldi r26, RAMbeg + next_RAM
-	rcall rou_to_null
-	; change flags? [ ]
-	; обнуление двух битов счетчика в регистре флагов act_flags
-	andi act_flags, 0b11111111 - (0b11 << Pom_Count_0)	; cbr?
-	; сдвиг счетчика в temp в его позицию в act_flags
-	;clc 
-	.macro log_shift_left 
-		.if @1 > 0
-			lsl @0
-		.endif
-		.if @1 > 1
-			lsl @0
-		.endif
-		.if @1 > 2
-			lsl @0
-		.endif
-		.if @1 > 3
-			lsl @0
-		.endif
-		.if @1 > 4
-			lsl @0
-		.endif
-		.if @1 > 5
-			lsl @0
-		.endif
-		.if @1 > 6
-			lsl @0
-		.endif
-	.endmacro
+	
+	; if Pom_Count < 3 & Pom_break_flag = 1:
+	;		set_short_break
+	; elif Pom_Count = 3 & Pom_break_flag = 1:
+	;		set_long_break
+	; --> if Pom_b_f = 0 : main_t
+	;	else: if Pom_count = 3: long
+	;			else: short
+
+	sbrc act_flags, Pom_break_flag	; if P_b_f = 1
+		rjmp set_break
+	rjmp set_main_t					; else main_t
+	ret	; никогда не выполняется
+
+	set_main_t:
+		; change flags? [ ]
+		; обновление Pom_break_flag
+		set
+		bld act_flags, Pom_break_flag
+			; обнуление
+		; Старший байт? (должен быть младший)
+		ldi r26, RAMbeg
+		;end_t_routine 90
+		;ldi r26, RAMbeg + next_RAM
+		ld temp, x
+		subi temp, LOW(tim_m1)	; M25
+		ldi r26, RAMbeg + next_RAM + 2
+		st x, temp
+
+		ldi r26, RAMbeg + 1
+		ld temp, x
+		sbci temp, BYTE2(tim_m1)
+		ldi r26, RAMbeg + next_RAM + 1
+		st x, temp
+
+		ldi r26, RAMbeg + 2
+		ld temp, x
+		sbci temp, BYTE3(tim_m1)
+		ldi r26, RAMbeg + next_RAM
+		st x, temp
+		
+		ldi r26, RAMbeg + next_RAM + 2
+		ret
+
+	set_break:
+		; обновление Pom_break_flag
+		clt
+		bld act_flags, Pom_break_flag
+
+		bst act_flags, Pom_Count_0	; проверить, не сломалась ли процедура с T
+		bld temp, 0
+		bst act_flags, Pom_Count_1	; проверить, не сломалась ли процедура с T
+		bld temp, 1
+		inc temp
+		; if Pom_Count > 3
+		sbrc temp, 3	; Skip if Bit in Register Cleared
+			rjmp set_long_break
+	set_short_break:
+		; обновление Pom_count
+		; change flags? [ ]
+		; обнуление двух битов счетчика в регистре флагов act_flags
+		andi act_flags, 0b11111111 - (0b11 << Pom_Count_0)	; cbr?
+		; сдвиг счетчика в temp в его позицию в act_flags
+		; macro
 	;lsl temp
 	log_shift_left temp, Pom_Count_0
-	; прибавление к РФ act_flags значения счетчика:
-	add act_flags, temp
-ret
+		; прибавление к РФ act_flags значения счетчика:
+		add act_flags, temp
 
-	reset_Pom_Count_and_long_break:
-		load_im r18, r19, r20, M25
+			; обнуление
+		; Старший байт? (должен быть младший)
+		ldi r26, RAMbeg
+		;end_t_routine 90
+		;ldi r26, RAMbeg + next_RAM
+		ld temp, x
+		subi temp, LOW(tim_m2)	; M25
+		ldi r26, RAMbeg + next_RAM + 2
+		st x, temp
+
+		ldi r26, RAMbeg + 1
+		ld temp, x
+		sbci temp, BYTE2(tim_m2)
+		ldi r26, RAMbeg + next_RAM + 1
+		st x, temp
+
+		ldi r26, RAMbeg + 2
+		ld temp, x
+		sbci temp, BYTE3(tim_m2)
 		ldi r26, RAMbeg + next_RAM
-		rcall rou_to_null
-		; change flags? [ ]
-		andi act_flags, 0b11111111 - (0b11 << Pom_Count_0)	; cbr?
+		st x, temp
+		
+		ldi r26, RAMbeg + next_RAM + 2
+		ret
 
-ret
+	set_long_break:
+		; обновление Pom_count
+		; change flags? [ ]
+		; обнуление двух битов счетчика в регистре флагов act_flags
+		andi act_flags, 0b11111111 - (0b11 << Pom_Count_0)	; cbr?
+		
+			; обнуление
+		; Старший байт? (должен быть младший)
+		ldi r26, RAMbeg
+		;end_t_routine 90
+		;ldi r26, RAMbeg + next_RAM
+		ld temp, x
+		subi temp, LOW(tim_m3)	; M25
+		ldi r26, RAMbeg + next_RAM + 2
+		st x, temp
+
+		ldi r26, RAMbeg + 1
+		ld temp, x
+		sbci temp, BYTE2(tim_m3)
+		ldi r26, RAMbeg + next_RAM + 1
+		st x, temp
+
+		ldi r26, RAMbeg + 2
+		ld temp, x
+		sbci temp, BYTE3(tim_m3)
+		ldi r26, RAMbeg + next_RAM
+		st x, temp
+		
+		ldi r26, RAMbeg + next_RAM + 2
+		ret
+
+	
 
 
 ;_____________________
