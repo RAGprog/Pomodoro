@@ -141,9 +141,10 @@ reti
 red_delay:
 	new_t_routine lbl3
 		cbi portB, red_pnum
+		cbi portB, green_pnum
 		clt
 		bld act_flags, RedT ; флаг ожидания для СД
-	end_t_routine 90
+	;end_t_routine 90	; ??? [ ]
 	lbl3:
 ret
 
@@ -166,10 +167,7 @@ button_release:
  	bld act_flags, noiseT_release
 	tout	MCUCR,	MCUCR_pint0f    ; проверить [~]
 
-	; включение СД
-	set
-	bld act_flags, RedT ; флаг ожидания для СД
-	sbi portB, red_pnum	; изменение, относительно Att13, проверить там [ ]
+	
 	
 	; if Pom_Count < 3 & Pom_break_flag = 1:
 	;		set_short_break
@@ -212,6 +210,12 @@ button_release:
 		st x, temp
 		
 		ldi r26, RAMbeg + next_RAM + 2
+
+		; включение СД
+		set
+		bld act_flags, RedT ; флаг ожидания для СД
+		sbi portB, red_pnum	; изменение, относительно Att13, проверить там [ ]
+
 		ret
 
 	set_break:
@@ -219,23 +223,26 @@ button_release:
 		clt
 		bld act_flags, Pom_break_flag
 
+		clr temp
 		bst act_flags, Pom_Count_0	; проверить, не сломалась ли процедура с T
 		bld temp, 0
 		bst act_flags, Pom_Count_1	; проверить, не сломалась ли процедура с T
 		bld temp, 1
 		inc temp
+		; обнуление двух битов счетчика в регистре флагов act_flags
+		andi act_flags, 0b11111111 - (0b11 << Pom_Count_0)	; cbr? ; можно заранее [ ]
+		
 		; if Pom_Count > 3
-		sbrc temp, 3	; Skip if Bit in Register Cleared
+		sbrc temp, 2	; ~log2 + 1 ; Skip if Bit in Register Cleared
 			rjmp set_long_break
 	set_short_break:
 		; обновление Pom_count
 		; change flags? [ ]
-		; обнуление двух битов счетчика в регистре флагов act_flags
-		andi act_flags, 0b11111111 - (0b11 << Pom_Count_0)	; cbr?
+		
 		; сдвиг счетчика в temp в его позицию в act_flags
 		; macro
-	;lsl temp
-	log_shift_left temp, Pom_Count_0
+		;lsl temp
+		log_shift_left temp, Pom_Count_0
 		; прибавление к РФ act_flags значения счетчика:
 		add act_flags, temp
 
@@ -262,14 +269,18 @@ button_release:
 		st x, temp
 		
 		ldi r26, RAMbeg + next_RAM + 2
+
+		; включение СД изменить redT? [ ]
+		set
+		bld act_flags, RedT ; флаг ожидания для СД
+		sbi portB, green_pnum	; изменение, относительно Att13, проверить там [ ]
+
 		ret
 
 	set_long_break:
 		; обновление Pom_count
 		; change flags? [ ]
-		; обнуление двух битов счетчика в регистре флагов act_flags
-		andi act_flags, 0b11111111 - (0b11 << Pom_Count_0)	; cbr?
-		
+
 			; обнуление
 		; Старший байт? (должен быть младший)
 		ldi r26, RAMbeg
@@ -293,6 +304,12 @@ button_release:
 		st x, temp
 		
 		ldi r26, RAMbeg + next_RAM + 2
+
+		; включение СД изменить redT? [ ]
+		set
+		bld act_flags, RedT ; флаг ожидания для СД
+		sbi portB, green_pnum	; изменение, относительно Att13, проверить там [ ]
+
 		ret
 
 	
@@ -342,6 +359,14 @@ Start: ;_____________________________RESET:__________________________
 	;  на всякий случай, для переменных таймера, очищаем 2 ячейки стека
 	clr temp
 	clr r17
+	clr r18
+	clr r19
+	clr r20
+	clr r21
+	clr r22
+	clr r23
+	clr r24
+	clr r25
 	push temp
 	push temp
 	
