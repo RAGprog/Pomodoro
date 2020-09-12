@@ -107,27 +107,26 @@ TIM_OVF1: ;________________________________
 reti
 
 TIM_OVF0: ;________________________________
-	;old_timer_m
 	timer_m
-	new_t_routine lbl1
-		; включение/отключение светодиода каждый вызов
-		ldi tcomp, 1 << 6    ; маска, по которой будет происходить операция XOR
-		mov r4, tcomp	; хранится в r4
-		in tcomp, portB
-		eor tcomp, r4
-		out portB, tcomp
-	end_t_routine 90
-	lbl1:
 
-	new_t_routine lbl2
-		; включение/отключение светодиода каждый вызов
-		ldi tcomp, 1 << 7    ; маска, по которой будет происходить операция XOR
-		mov r4, tcomp	; хранится в r4
-		in tcomp, portB
-		eor tcomp, r4
-		out portB, tcomp
-	end_t_routine 30
-	lbl2:
+	; Пример новой ПП: | Exemple of new subroutine:
+	; Далее @0 - номер вывода, @1 - значение задержки
+	; начало ПП:
+	;new_t_routine lbl1
+	; тело ПП:
+	;	; включение/отключение светодиода каждый вызов
+	;	ldi tcomp, 1 << @0    ; маска, по которой будет происходить операция XOR
+	;	mov r4, tcomp	; хранится в r4
+	;	in tcomp, portB
+	;	eor tcomp, r4
+	;	out portB, tcomp
+	; конец ПП:
+	;end_t_routine @1
+	;lbl1:
+
+	;blink_m 4, 120, lbl1
+	;lbl1:
+
 
 	; skip if noiseT flag not set    |  Пропустить, если флаг noiseT не установлен
 	sbrc act_flags, noiseT  ;
@@ -176,6 +175,11 @@ button_release:
 	; --> if Pom_b_f = 0 : main_t
 	;	else: if Pom_count = 3: long
 	;			else: short
+
+	; решение проблемы с одновременным включением двух СД:
+	; проверка активности СД:
+	sbrc act_flags, redT
+		ret
 
 	sbrc act_flags, Pom_break_flag	; if P_b_f = 1
 		rjmp set_break

@@ -170,61 +170,61 @@
 
 
     ;____________________________________________________________________
-	; testing | тестовое мигание светодиодом
-	;____________________________________________________________________
-    ; (?) Проверяем, настало ли время действовать
-    ; address in RAM for blinking by LED | адрес для этой операции в ОЗУ
-    ;clr r27
-    ; можно пропустить, так как адрес уже установлен предыдущей загрузкой
-    .set next_RAM = next_RAM + 3
-	ldi r26, RAMbeg + next_RAM ; - after timer's bytes | после байтов таймера
-    ; удобнее сравнить сначала старшие (H), значит и хранить так
-    ; нужно инициализировать [ ]
-    ld tcomp, x+
-    cp tcomp, timeHH
-    brne tim_rou_1
-    ld tcomp, x+
-    cp tcomp, timeH
-    brne tim_rou_1
-    ld tcomp, x
-    cp tcomp, timeL
-    brne tim_rou_1
+	;; testing | тестовое мигание светодиодом
+	;;____________________________________________________________________
+    ;; (?) Проверяем, настало ли время действовать
+    ;; address in RAM for blinking by LED | адрес для этой операции в ОЗУ
+    ;;clr r27
+    ;; можно пропустить, так как адрес уже установлен предыдущей загрузкой
+    ;.set next_RAM = next_RAM + 3
+	;ldi r26, RAMbeg + next_RAM ; - after timer's bytes | после байтов таймера
+    ;; удобнее сравнить сначала старшие (H), значит и хранить так
+    ;; нужно инициализировать [ ]
+    ;ld tcomp, x+
+    ;cp tcomp, timeHH
+    ;brne tim_rou_1
+    ;ld tcomp, x+
+    ;cp tcomp, timeH
+    ;brne tim_rou_1
+    ;ld tcomp, x
+    ;cp tcomp, timeL
+    ;brne tim_rou_1
 
-    ; включение/отключение светодиода каждый вызов
-    ldi tcomp, 1 << 5	; маска, по которой будет происходить операция XOR
-    mov r4, tcomp	; хранится в r4
-    in tcomp, portB
-    eor tcomp, r4
-    out portB, tcomp
+    ;; включение/отключение светодиода каждый вызов
+    ;ldi tcomp, 1 << 5	; маска, по которой будет происходить операция XOR
+    ;mov r4, tcomp	; хранится в r4
+    ;in tcomp, portB
+    ;eor tcomp, r4
+    ;out portB, tcomp
 
-    ; обновление переменных в ОЗУ
-    ld tcomp, x
-    subi tcomp, LOW(blink_delay)
-    st x, tcomp
-    ld tcomp, -x
-    sbci tcomp, BYTE2(blink_delay)
-    st x, tcomp
-    ld tcomp, -x
-    sbci tcomp, BYTE3(blink_delay)
-    st x, tcomp
-    ; при переходе через ноль?
-    ;brlo fix   ; [~]
-	brcc tim_rou_1	; если не было перехода в отрицательные значения, то 
-				; перейти на метку "not_update_blink_delay"/"tim_rou_1"
-	; отнять от (time - blink_delay) дельту между ffffff и day
-	ldi r26, RAMbeg + 3
-	ld tcomp, x
-    subi tcomp, LOW($ffffff - day)
-    st x, tcomp
-    ld tcomp, -x
-    sbci tcomp, BYTE2($ffffff - day)
-    st x, tcomp
-    ld tcomp, -x
-    sbci tcomp, BYTE3($ffffff - day)
-    st x, tcomp
-	;not_update_blink_delay:
-    tim_rou_1:
-    ; *адрес потерян
+    ;; обновление переменных в ОЗУ
+    ;ld tcomp, x
+    ;subi tcomp, LOW(blink_delay)
+    ;st x, tcomp
+    ;ld tcomp, -x
+    ;sbci tcomp, BYTE2(blink_delay)
+    ;st x, tcomp
+    ;ld tcomp, -x
+    ;sbci tcomp, BYTE3(blink_delay)
+    ;st x, tcomp
+    ;; при переходе через ноль?
+    ;;brlo fix   ; [~]
+	;brcc tim_rou_1	; если не было перехода в отрицательные значения, то 
+	;			; перейти на метку "not_update_blink_delay"/"tim_rou_1"
+	;; отнять от (time - blink_delay) дельту между ffffff и day
+	;ldi r26, RAMbeg + 3
+	;ld tcomp, x
+    ;subi tcomp, LOW($ffffff - day)
+    ;st x, tcomp
+    ;ld tcomp, -x
+    ;sbci tcomp, BYTE2($ffffff - day)
+    ;st x, tcomp
+    ;ld tcomp, -x
+    ;sbci tcomp, BYTE3($ffffff - day)
+    ;st x, tcomp
+	;;not_update_blink_delay:
+    ;tim_rou_1:
+    ;; *адрес потерян
 
     ;sei    ; устанавливается сам?
 ;reti   ; to ad after macro | добавить после макроса
@@ -564,4 +564,18 @@
 			mov temp, r4	; temp recovery
 			sei
 	reti
+.endmacro
+
+.macro blink_m	; @0 - номер вывода, 
+;@1 - задержка,
+;@2 - метка (указывает на место после blink_m)
+	new_t_routine @2
+		; включение/отключение светодиода каждый вызов
+		ldi tcomp, 1 << @0    ; маска, по которой будет происходить операция XOR
+		mov r4, tcomp	; хранится в r4
+		in tcomp, portB
+		eor tcomp, r4
+		out portB, tcomp
+	end_t_routine @1
+	lbl1:
 .endmacro
