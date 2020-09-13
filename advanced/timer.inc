@@ -579,3 +579,78 @@
 	end_t_routine @1
 	lbl1:
 .endmacro
+
+.macro d7seg_pre
+	; def
+	.equ d1 = 0
+	.equ d2 = 1
+	.equ d3 = 4
+	.equ d4 = 6
+
+	.equ seg0 = 0b00111111
+	.equ seg1 = 0b00110
+	.equ seg2 = 0b01011011
+	.equ seg3 = 0b01001111
+	.equ nseg0 = 0b11000000
+	.equ nseg1 = 0b11111001
+	.equ nseg2 = 0b10100100
+	.equ nseg3 = 0b10110000
+	; init
+	tout ddrD, 1 << d1
+	tout portD, 1 << d1 | setup_pin
+	tout portB, nseg0
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+
+	tout ddrD, 1 << d2
+	tout portD, 1 << d2 | setup_pin
+	tout portB, nseg1
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+
+	tout ddrD, 1 << d3
+	tout portD, 1 << d3 | setup_pin
+	tout portB, nseg2
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+
+	tout ddrD, 1 << d4
+	tout portD, 1 << d4 | setup_pin
+	tout portB, nseg3
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+
+
+.endmacro

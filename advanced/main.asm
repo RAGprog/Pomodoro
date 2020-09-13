@@ -35,6 +35,7 @@ testmode 1 ; 1 = test mode (3s), 0 = prod. mode (25min)
 .equ Pom_Count_0 = 3	; Подсчет включений таймера
 .equ Pom_Count_1 = 4	; (max = 2^2 = 4)
 .equ Pom_break_flag = 5	; Следующая задержка - перерыв (5мин)
+.equ digits_flag = 7
 
 ;.def setStatus = r2
 ;.def mode = r21	; 1 = 1s, 2 = 3s
@@ -160,11 +161,19 @@ button_press:
 	set
 	bld act_flags, noiseT_release
 	tout	MCUCR,	MCUCR_pint0r
+
+	; digits ON
+	set
+	bld act_flags, digits_flag
 ret
 button_release:
  	clt
  	bld act_flags, noiseT_release
 	tout	MCUCR,	MCUCR_pint0f    ; проверить [~]
+
+	; digits OFF
+	clt
+	bld act_flags, digits_flag
 
 	
 	
@@ -386,8 +395,10 @@ Loop: ;________________________________
 	;sbis pinD, setup_pnum
 	;out portB, temp	;rcall new
 
-	sleep	;
-	
+	sbrs act_flags, digits_flag
+		sleep	;
+	sbrc act_flags, digits_flag
+		d7seg_pre
       rjmp  Loop
 
 ;====================================================================
