@@ -52,7 +52,7 @@ timer_var r23, r24, r25, r16, r22
       ; Reset Vector
       rjmp  Start
 	rjmp EXT_INT0 ; IRQ0 Handler
-	reti	;	rjmp EXT_INT1 ; IRQ1 Handler
+	rjmp EXT_INT1 ; IRQ1 Handler
 	reti	;	rjmp TIM_CAPT1 ; Timer1 Capture Handler
 	reti	;	rjmp TIM_COMP1 ; Timer1 Compare Handler
 	rjmp TIM_OVF1 ; Timer1 Overflow Handler
@@ -101,6 +101,11 @@ reti
 
 ;		mov mode, bmode
 
+reti
+
+EXT_INT1:
+	tout ddrB, 0
+	out portB, temp
 reti
 
 TIM_OVF1: ;________________________________
@@ -174,6 +179,19 @@ button_release:
 	; digits OFF
 	clt
 	bld act_flags, digits_flag
+	tout portB, 0
+	in temp, portD
+	andi temp, 0b0011000    ; маска, по которой будет происходить операция AND
+	out portD, tcomp
+	in temp, ddrD
+	andi temp, 0b0011000    ; маска, по которой будет происходить операция AND
+	out ddrD, tcomp
+
+	; Исправление работы СД - в другом месте [ ]
+	;sbrc act_flags, RedT ; флаг ожидания для СД
+	;sbi portB, red_pnum
+	;sbrc act_flags, RedT ; флаг ожидания для СД
+	;sbi portB, green_pnum
 
 	
 	
@@ -349,9 +367,9 @@ Start: ;_____________________________RESET:__________________________
 ; pins int
 	; int0
 
-	tout	GIMSK,	0 << int1 |	1 << int0	; General Interrupt Mask
+	tout	GIMSK,	1 << int1 |	1 << int0	; General Interrupt Mask
 	; MCU Control Register, Interrupt Sense Control
-	tout	MCUCR,	sleep_e |	sleep_m |	0 << ISC11 |	0 << ISC10 |	1 << ISC01 |	0 << ISC00
+	tout	MCUCR,	sleep_e |	sleep_m |	1 << ISC11 |	0 << ISC10 |	1 << ISC01 |	0 << ISC00
 	; ...Interrupt 0 Sense Control 10 - falling edge, 11 - rising, 00 - Low lvl; = MCUCR_pint0r
 
 ; sleep mode and pwr down
@@ -361,7 +379,8 @@ Start: ;_____________________________RESET:__________________________
 
     tout ddrB, 255	; init outputs
 	
-	tout portD, setup_pin	; init setup button
+	tout portD, setup_pin | button2_pin	; init setup button
+	;tout portD, button2_pin
 
 	ldi bmode, 1	; init first mode
 	; clr from random val

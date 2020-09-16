@@ -19,6 +19,9 @@
 .equ setup_pin = 1 << 2
 .equ setup_pnum = 2
 
+.equ button2_pnum = 3
+.equ button2_pin = 1 << button2_pnum
+
 ;sleep mode
 ;.equ sleep_e = 1	; enable
 .equ sleep_e = 1 << SE
